@@ -1,8 +1,8 @@
 dev:
     uv run fastapi dev main.py
 
-lint:
-    uv run ty check .
+typecheck:
+    uv run ty check
 
-format:
-    uv run ruff check .
+lint:
+    uv run ruff check --fix
