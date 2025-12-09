@@ -2,6 +2,7 @@ from enum import Enum
 from typing import TypedDict
 
 from fastapi import FastAPI
+from pydantic import BaseModel
 
 
 class ModelName(str, Enum):
@@ -13,11 +14,11 @@ class ModelName(str, Enum):
 app = FastAPI()
 
 
-class Item(TypedDict):
+class FakeItem(TypedDict):
     item_name: str
 
 
-fake_items_db: list[Item] = [
+fake_items_db: list[FakeItem] = [
     {"item_name": "Foo"},
     {"item_name": "Bar"},
     {"item_name": "Baz"},
@@ -27,6 +28,30 @@ fake_items_db: list[Item] = [
 @app.get("/items")
 async def read_items(key: str, skip: int = 0, limit: int = 10):
     return {"key": key, "items": fake_items_db[skip : skip + limit]}
+
+
+class Item(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    tax: float | None = None
+
+
+@app.post("/items")
+async def create_item(item: Item):
+    item_dict = item.model_dump()
+    if item.tax is not None:
+        price_with_tax = item.price + item.tax
+        item_dict.update({"price_with_tax": price_with_tax})
+    return item_dict
+
+
+@app.put("/items/{item_id}")
+async def update_item(item_id: int, item: Item, key: str | None = None):
+    result = {"item_id": item_id}
+    if key is not None:
+        result.update(**item.model_dump())
+    return result
 
 
 @app.get("/items/{item_id}")
