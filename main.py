@@ -1,10 +1,10 @@
-from datetime import datetime, time, timedelta
 from enum import Enum
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Body, FastAPI, Path, Query
-from pydantic import BaseModel, Field, HttpUrl
+from anyio import sleep
+from fastapi import Body, FastAPI, Form, status
+from pydantic import BaseModel, EmailStr, Field, HttpUrl
 
 
 class ModelName(str, Enum):
@@ -62,12 +62,91 @@ class Offer(BaseModel):
     items: list[Item]
 
 
-class User(BaseModel):
-    username: str
-    full_name: str | None = None
+# class BaseUser(BaseModel):
+#     username: str
+#     email: EmailStr
+#     full_name: str | None = None
+
+
+# class UserIn(BaseUser):
+#     password: str
 
 
 app = FastAPI()
+
+
+@app.post("/login/", status_code=status.HTTP_201_CREATED)
+async def login(username: Annotated[str, Form()], password: Annotated[str, Form()]):
+    return {"username": username}
+
+
+class UserBase(BaseModel):
+    username: str
+    email: EmailStr
+    full_name: str | None = None
+
+
+class UserIn(UserBase):
+    password: str
+
+
+class UserOut(UserBase):
+    pass
+
+
+class UserInDB(UserBase):
+    hashed_password: str
+
+
+async def fake_hash_password(raw_password: str) -> str:
+    await sleep(1)
+    return f"supersecret{raw_password}"
+
+
+async def fake_save_user(user_in: UserIn) -> UserInDB:
+    hashed_password = await fake_hash_password(user_in.password)
+    user_in_db = UserInDB(**user_in.model_dump(), hashed_password=hashed_password)
+    print("User saved! Just kidding...")
+    return user_in_db
+
+
+@app.post("/user", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+async def create_user(user_in: UserIn):
+    user_saved = await fake_save_user(user_in)
+    return user_saved
+
+
+class BaseItem(BaseModel):
+    description: str
+    type: str
+
+
+class CarItem(BaseItem):
+    type: str = "car"
+
+
+class PlaneItem(BaseItem):
+    type: str = "plane"
+    size: int
+
+
+items = {
+    "item1": {"description": "All my friends drive a low rider", "type": "car"},
+    "item2": {
+        "description": "Music is my aeroplane, it's my aeroplane",
+        "type": "plane",
+        "size": 5,
+    },
+}
+
+
+@app.get(
+    "/items/{item_id}",
+    response_model=(PlaneItem | CarItem),
+    status_code=status.HTTP_200_OK,
+)
+async def read_item(item_id: str):
+    return items[item_id]
 
 
 data = {
@@ -93,72 +172,89 @@ async def create_multiple_images(images: list[Image]):
     return images
 
 
-@app.get("/items/")
-async def read_items(filter_query: Annotated[FilterParams, Query()]):
-    return filter_query
+# @app.post("/users")
+# async def create_user(user: UserIn) -> BaseUser:
+#     return user
 
 
-@app.post("/items/")
-async def create_item(user_id: UUID, item: Annotated[Item, Body(embed=True)]):
+# @app.get("/items")
+# async def read_items(
+#     # filter_query: Annotated[FilterParams, Query()],
+#     # ads_id: Annotated[str | None, Cookie()] = None,
+#     # user_agent: Annotated[str | None, Header()] = None,
+#     # accept: Annotated[str | None, Header()] = None,
+# ) -> list[Item]:
+#     # result = {
+#     #     "ads_id": ads_id,
+#     #     "User-Agent": user_agent,
+#     #     "Accept": accept,
+#     #     **filter_query.model_dump(),
+#     # }
+#     # return result
+#     return [Item(name="Portal Gun", price=42), Item(name="Plumbus", price=32.5)]
+
+
+@app.post("/items")
+async def create_item(user_id: UUID, item: Annotated[Item, Body(embed=True)]) -> Item:
     item_dict = item.model_dump()
     result = {"user_id": user_id, **item_dict}
     if item.tax is not None:
         price_with_tax = item.price + item.tax
         result.update({"price_with_tax": price_with_tax})
-    return result
-
-
-@app.put("/items/{item_id}")
-async def update_item(
-    item_id: Annotated[UUID, Path(title="The ID of the item to get")],
-    item: Item,
-    user: User,
-    start_datetime: Annotated[datetime, Body()],
-    end_datetime: Annotated[datetime, Body()],
-    process_after: Annotated[timedelta, Body()],
-    repeat_at: Annotated[time | None, Body()] = None,
-    importance: Annotated[int, Body()] = 1,
-    q: str | None = None,
-):
-    start_process = start_datetime + process_after
-    duration = end_datetime - start_process
-    results = {
-        "item_id": item_id,
-        "item": item,
-        "user": user,
-        "start_datetime": start_datetime,
-        "end_datetime": end_datetime,
-        "process_after": process_after,
-        "repeat_at": repeat_at,
-        "start_process": start_process,
-        "duration": duration,
-        "importance": importance,
-    }
-    if q:
-        results.update({"q": q})
-    return results
-
-
-@app.get("/items/{item_id}/")
-async def read_item(
-    item_id: Annotated[
-        UUID,
-        Path(title="The ID of the item to get", gt=1, lt=100),
-    ],
-    key: Annotated[
-        str | None, Query(min_length=16, pattern="^api-", title="Api Key")
-    ] = None,
-    q: Annotated[str | None, Query(alias="item-query")] = None,
-    short: bool = False,
-):
-    item = {"item_id": item_id, "key": key}
-    if q:
-        item.update({"q": q})
-    if not short:
-        item.update(
-            {"description": "This is an amazing item that has a long description"}
-        )
     return item
+
+
+# @app.put("/items/{item_id}")
+# async def update_item(
+#     item_id: Annotated[UUID, Path(title="The ID of the item to get")],
+#     item: Item,
+#     user: User,
+#     start_datetime: Annotated[datetime, Body()],
+#     end_datetime: Annotated[datetime, Body()],
+#     process_after: Annotated[timedelta, Body()],
+#     repeat_at: Annotated[time | None, Body()] = None,
+#     importance: Annotated[int, Body()] = 1,
+#     q: str | None = None,
+# ):
+#     start_process = start_datetime + process_after
+#     duration = end_datetime - start_process
+#     results = {
+#         "item_id": item_id,
+#         "item": item,
+#         "user": user,
+#         "start_datetime": start_datetime,
+#         "end_datetime": end_datetime,
+#         "process_after": process_after,
+#         "repeat_at": repeat_at,
+#         "start_process": start_process,
+#         "duration": duration,
+#         "importance": importance,
+#     }
+#     if q:
+#         results.update({"q": q})
+#     return results
+
+
+# @app.get("/items/{item_id}/")
+# async def read_item(
+#     item_id: Annotated[
+#         UUID,
+#         Path(title="The ID of the item to get", gt=1, lt=100),
+#     ],
+#     key: Annotated[
+#         str | None, Query(min_length=16, pattern="^api-", title="Api Key")
+#     ] = None,
+#     q: Annotated[str | None, Query(alias="item-query")] = None,
+#     short: bool = False,
+# ):
+#     item = {"item_id": item_id, "key": key}
+#     if q:
+#         item.update({"q": q})
+#     if not short:
+#         item.update(
+#             {"description": "This is an amazing item that has a long description"}
+#         )
+#     return item
 
 
 @app.get("/users/me/")

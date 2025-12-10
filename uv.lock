@@ -267,6 +267,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/5a/87/b70ad306ebb6f9b585f114d0ac2137d792b48be34d732d60e597c2f8465a/pydantic-2.12.5-py3-none-any.whl", hash = "sha256:e561593fccf61e8a20fc46dfc2dfe075b8be7d0188df33f221ad1f0139180f9d", size = 463580, upload-time = "2025-11-26T15:11:44.605Z" },
 ]
 
+[package.optional-dependencies]
+email = [
+    { name = "email-validator" },
+]
+
 [[package]]
 name = "pydantic-core"
 version = "2.41.5"
@@ -365,6 +370,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "fastapi", extra = ["standard-no-fastapi-cloud-cli"] },
+    { name = "pydantic", extra = ["email"] },
 ]
 
 [package.dev-dependencies]
@@ -374,7 +380,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "fastapi", extras = ["standard-no-fastapi-cloud-cli"], specifier = ">=0.124.0" }]
+requires-dist = [
+    { name = "fastapi", extras = ["standard-no-fastapi-cloud-cli"], specifier = ">=0.124.0" },
+    { name = "pydantic", extras = ["email"], specifier = ">=2.12.5" },
+]
 
 [package.metadata.requires-dev]
 dev = [
