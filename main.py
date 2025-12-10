@@ -2,7 +2,7 @@ import random
 from enum import Enum
 from typing import Annotated
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Path, Query
 from pydantic import AfterValidator, BaseModel
 
 
@@ -70,7 +70,17 @@ async def update_item(
 
 
 @app.get("/items/{item_id}/")
-async def read_item(item_id: int, key: str, q: str | None = None, short: bool = False):
+async def read_item(
+    item_id: Annotated[
+        int,
+        Path(title="The ID of the item to get", gt=1, lt=100),
+    ],
+    key: Annotated[
+        str | None, Query(min_length=16, pattern="^api-", title="Api Key")
+    ] = None,
+    q: Annotated[str | None, Query(alias="item-query")] = None,
+    short: bool = False,
+):
     item = {"item_id": item_id, "key": key}
     if q:
         item.update({"q": q})
