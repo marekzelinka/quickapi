@@ -2,7 +2,7 @@ import random
 from enum import Enum
 from typing import Annotated
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from pydantic import AfterValidator, BaseModel
 
 
@@ -22,7 +22,7 @@ data = {
 }
 
 
-def check_valid_id(id: str):
+def check_valid_id(id: str) -> str:
     if not id.startswith(("isbn-", "imdb-")):
         raise ValueError('Invalid ID format, it must start with "isbn-" or "imdb-"')
     return id
@@ -56,7 +56,13 @@ async def create_item(item: Item):
 
 
 @app.put("/items/{item_id}/")
-async def update_item(item_id: int, item: Item, key: str | None = None):
+async def update_item(
+    item_id: int,
+    item: Item,
+    key: Annotated[
+        str | None, Query(min_length=16, pattern="^api-", title="Api Key")
+    ] = None,
+):
     result = {"item_id": item_id}
     if key is not None:
         result.update(**item.model_dump())
