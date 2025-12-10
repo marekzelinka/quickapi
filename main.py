@@ -1,5 +1,7 @@
+from datetime import datetime, time, timedelta
 from enum import Enum
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Body, FastAPI, Path, Query
 from pydantic import BaseModel, Field, HttpUrl
@@ -97,7 +99,7 @@ async def read_items(filter_query: Annotated[FilterParams, Query()]):
 
 
 @app.post("/items/")
-async def create_item(user_id: int, item: Annotated[Item, Body(embed=True)]):
+async def create_item(user_id: UUID, item: Annotated[Item, Body(embed=True)]):
     item_dict = item.model_dump()
     result = {"user_id": user_id, **item_dict}
     if item.tax is not None:
@@ -108,24 +110,39 @@ async def create_item(user_id: int, item: Annotated[Item, Body(embed=True)]):
 
 @app.put("/items/{item_id}")
 async def update_item(
-    item_id: Annotated[int, Path(title="The ID of the item to get", ge=0, le=1000)],
+    item_id: Annotated[UUID, Path(title="The ID of the item to get")],
     item: Item,
     user: User,
+    start_datetime: Annotated[datetime, Body()],
+    end_datetime: Annotated[datetime, Body()],
+    process_after: Annotated[timedelta, Body()],
+    repeat_at: Annotated[time | None, Body()] = None,
     importance: Annotated[int, Body()] = 1,
     q: str | None = None,
 ):
-    results = {"item_id": item_id, "item": item, "user": user}
+    start_process = start_datetime + process_after
+    duration = end_datetime - start_process
+    results = {
+        "item_id": item_id,
+        "item": item,
+        "user": user,
+        "start_datetime": start_datetime,
+        "end_datetime": end_datetime,
+        "process_after": process_after,
+        "repeat_at": repeat_at,
+        "start_process": start_process,
+        "duration": duration,
+        "importance": importance,
+    }
     if q:
         results.update({"q": q})
-    if importance:
-        results.update({"importance": importance})
     return results
 
 
 @app.get("/items/{item_id}/")
 async def read_item(
     item_id: Annotated[
-        int,
+        UUID,
         Path(title="The ID of the item to get", gt=1, lt=100),
     ],
     key: Annotated[
@@ -151,7 +168,7 @@ async def read_user_me():
 
 @app.get("/users/{user_id}/items/{item_id}/")
 async def read_user_item(
-    user_id: int, item_id: int, q: str | None = None, short: bool = False
+    user_id: UUID, item_id: UUID, q: str | None = None, short: bool = False
 ):
     item = {"item_id": item_id, "owner_id": user_id}
     if q:
