@@ -1,15 +1,21 @@
-import random
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import FastAPI, Path, Query
-from pydantic import AfterValidator, BaseModel
+from pydantic import BaseModel, Field
 
 
 class ModelName(str, Enum):
     alexnet = "alexnet"
     resnet = "resnet"
     lenet = "lenet"
+
+
+class FilterParams(BaseModel):
+    limit: int = Field(100, gt=0, le=100)
+    offset: int = Field(0, ge=0)
+    order_by: Literal["created_at", "updated_at"] = "created_at"
+    tags: list[str] = []
 
 
 app = FastAPI()
@@ -29,14 +35,8 @@ def check_valid_id(id: str) -> str:
 
 
 @app.get("/items/")
-async def read_items(
-    id: Annotated[str | None, AfterValidator(check_valid_id)] = None,
-):
-    if id:
-        item = data.get(id)
-    else:
-        id, item = random.choice(list(data.items()))
-    return {"id": id, "name": item}
+async def read_items(filter_query: Annotated[FilterParams, Query()]):
+    return filter_query
 
 
 class Item(BaseModel):
