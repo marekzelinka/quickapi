@@ -47,7 +47,7 @@ class Offer(BaseModel):
 
 
 class User(BaseModel):
-    username: stsr
+    username: str
     full_name: str | None = None
 
 
