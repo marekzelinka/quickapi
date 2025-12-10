@@ -1,8 +1,8 @@
 from enum import Enum
-from typing import Annotated, Literal
+from typing import Annotated
 
-from fastapi import FastAPI, Path, Query
-from pydantic import BaseModel, Field
+from fastapi import Body, FastAPI, Path, Query
+from pydantic import BaseModel, Field, HttpUrl
 
 
 class ModelName(str, Enum):
@@ -11,11 +11,44 @@ class ModelName(str, Enum):
     lenet = "lenet"
 
 
+class OrderBy(str, Enum):
+    created_at = "created_at"
+    updated_at = "updated_at"
+
+
 class FilterParams(BaseModel):
     limit: int = Field(100, gt=0, le=100)
     offset: int = Field(0, ge=0)
-    order_by: Literal["created_at", "updated_at"] = "created_at"
+    order_by: OrderBy = OrderBy.created_at
     tags: list[str] = []
+
+
+class Image(BaseModel):
+    url: HttpUrl
+    name: str
+
+
+class Item(BaseModel):
+    name: str
+    description: str | None = Field(
+        None, title="The description of the item", max_length=300
+    )
+    price: float = Field(gt=0, description="The price must be greater than zero")
+    tax: float | None = None
+    tags: set[str] = set()
+    images: list[Image] | None = None
+
+
+class Offer(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    items: list[Item]
+
+
+class User(BaseModel):
+    username: stsr
+    full_name: str | None = None
 
 
 app = FastAPI()
@@ -34,39 +67,45 @@ def check_valid_id(id: str) -> str:
     return id
 
 
+@app.post("/offers/")
+async def create_offer(offer: Offer):
+    return offer
+
+
+@app.post("/images/multiple/")
+async def create_multiple_images(images: list[Image]):
+    return images
+
+
 @app.get("/items/")
 async def read_items(filter_query: Annotated[FilterParams, Query()]):
     return filter_query
 
 
-class Item(BaseModel):
-    name: str
-    description: str | None = None
-    price: float
-    tax: float | None = None
-
-
 @app.post("/items/")
-async def create_item(item: Item):
+async def create_item(user_id: int, item: Annotated[Item, Body(embed=True)]):
     item_dict = item.model_dump()
+    result = {"user_id": user_id, **item_dict}
     if item.tax is not None:
         price_with_tax = item.price + item.tax
-        item_dict.update({"price_with_tax": price_with_tax})
-    return item_dict
-
-
-@app.put("/items/{item_id}/")
-async def update_item(
-    item_id: int,
-    item: Item,
-    key: Annotated[
-        str | None, Query(min_length=16, pattern="^api-", title="Api Key")
-    ] = None,
-):
-    result = {"item_id": item_id}
-    if key is not None:
-        result.update(**item.model_dump())
+        result.update({"price_with_tax": price_with_tax})
     return result
+
+
+@app.put("/items/{item_id}")
+async def update_item(
+    item_id: Annotated[int, Path(title="The ID of the item to get", ge=0, le=1000)],
+    item: Item,
+    user: User,
+    importance: Annotated[int, Body()] = 1,
+    q: str | None = None,
+):
+    results = {"item_id": item_id, "item": item, "user": user}
+    if q:
+        results.update({"q": q})
+    if importance:
+        results.update({"importance": importance})
+    return results
 
 
 @app.get("/items/{item_id}/")
