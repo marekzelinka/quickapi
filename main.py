@@ -75,9 +75,14 @@ class Offer(BaseModel):
 app = FastAPI()
 
 
+class FormData(BaseModel):
+    username: str
+    password: str
+
+
 @app.post("/login/", status_code=status.HTTP_201_CREATED)
-async def login(username: Annotated[str, Form()], password: Annotated[str, Form()]):
-    return {"username": username}
+async def login(formData: Annotated[FormData, Form()]):
+    return {"username": formData.username, "password": formData.password}
 
 
 class UserBase(BaseModel):
