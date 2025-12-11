@@ -3,7 +3,7 @@ from typing import Annotated
 from uuid import UUID
 
 from anyio import sleep
-from fastapi import Body, FastAPI, Form, status
+from fastapi import Body, FastAPI, File, Form, UploadFile, status
 from pydantic import BaseModel, EmailStr, Field, HttpUrl
 
 
@@ -83,6 +83,20 @@ class FormData(BaseModel):
 @app.post("/login/", status_code=status.HTTP_201_CREATED)
 async def login(formData: Annotated[FormData, Form()]):
     return {"username": formData.username, "password": formData.password}
+
+
+@app.patch("/profile/avatar")
+async def update_avatar_file(
+    file: Annotated[
+        UploadFile | None, File(description="Update profile avatar")
+    ] = None,
+):
+    if not file:
+        return {"message": "No avatar uploaded"}
+
+    contents = await file.read()
+
+    return {"filename": file.filename}
 
 
 class UserBase(BaseModel):
