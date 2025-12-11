@@ -85,6 +85,17 @@ async def login(formData: Annotated[FormData, Form()]):
     return {"username": formData.username, "password": formData.password}
 
 
+@app.post("/signup", status_code=status.HTTP_200_OK)
+async def signup(
+    formData: Annotated[FormData, Form()], avatar: Annotated[UploadFile, File()]
+):
+    return {
+        "username": formData.username,
+        "password": formData.password,
+        "avatar": avatar.filename,
+    }
+
+
 @app.patch("/profile/avatar")
 async def update_avatar_file(
     file: Annotated[
